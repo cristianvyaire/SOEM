@@ -15,7 +15,7 @@ void initSlaves (char *interface) {
     /* Initialize SOEM, Bind Socket to Interface */
     if (ec_init(interface)) {
         /* Find and Auto-Config Slaves */
-        if (ec_config_init(FALSE)) {
+        if (ec_config_init(FALSE) > 0) {
             ec_config_map(&IOmap);
             ec_configdc();
 
