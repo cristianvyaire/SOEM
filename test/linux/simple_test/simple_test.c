@@ -37,20 +37,19 @@ void simpletest(char *ifname)
    if (ec_init(ifname))
    {
       printf("ec_init on %s succeeded.\n",ifname);
+
       /* find and auto-config slaves */
-
-
-       if ( ec_config_init(FALSE) > 0 )
+      if ( ec_config_init(FALSE) > 0 )
       {
          printf("%d slaves found and configured.\n",ec_slavecount);
 
          ec_config_map(&IOmap);
 
-         ec_configdc();
+         ec_configdc();	// Configure Distributed Clock
 
          printf("Slaves mapped, state to SAFE_OP.\n");
          /* wait for all slaves to reach SAFE_OP state */
-         ec_statecheck(0, EC_STATE_SAFE_OP,  EC_TIMEOUTSTATE * 4);
+         ec_statecheck(0, EC_STATE_SAFE_OP,  EC_TIMEOUTSTATE * 4);	// EC_TIMEOUTSTATE = 2sec
 
          oloop = ec_slave[0].Obytes;
          if ((oloop == 0) && (ec_slave[0].Obits > 0)) oloop = 1;

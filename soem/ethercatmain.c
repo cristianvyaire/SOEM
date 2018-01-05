@@ -2103,7 +2103,7 @@ uint16 ec_siiSMnext(uint16 slave, ec_eepromSMt* SM, uint16 n)
  *  @return mapping size in bits of PDO
  *  @see ecx_siiPDO
  */
-int ec_siiPDO(uint16 slave, ec_eepromPDOt* PDO, uint8 t)
+int x(uint16 slave, ec_eepromPDOt* PDO, uint8 t)
 {
    return ecx_siiPDO (&ecx_context, slave, PDO, t);
 }
