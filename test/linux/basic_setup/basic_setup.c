@@ -17,6 +17,13 @@
 
 #define EC_TIMEOUTMON 500
 
+/* Order matters when hooking up the hardware */
+//-------NAME---SLAVE#------
+#define EK1100    1
+#define EL2024    2
+#define EL1014    3
+#define SLAVE_COUNT 3
+
 char IOmap[4096];
 OSAL_THREAD_HANDLE thread1;
 int expectedWKC;
@@ -25,130 +32,82 @@ volatile int wkc;
 boolean inOP;
 uint8 currentgroup = 0;
 
-void basicInit(char *ifname) {
-    int i, j, oloop, iloop, chk;
-    needlf = FALSE;
-    inOP = FALSE;
 
-   printf("Starting Basic Setup Test\n");
+void set_output_int16 (uint16 slave_number, uint8 module_index, int16 value) {
+    uint8 *data_ptr;
 
-   /* initialise SOEM, bind socket to ifname */
-   if (!ec_init(ifname))
-   {
-      printf("ec_init on %s succeeded.\n",ifname);
+    data_ptr = ec_slave[slave_number].outputs;
+    /* Move pointer to correct module index*/
+    data_ptr += module_index * 2;
+    /* Read value byte by byte since all targets can't handle misaligned
+     * addresses
+     */
+    *data_ptr++ = (value >> 0) & 0xFF;
+    *data_ptr++ = (value >> 8) & 0xFF;
+}
 
-      /* find and auto-config slaves */
-      if (ec_config_init(FALSE) > 0)
-      {
-         printf("detected and configured %d slaves.\n",ec_slavecount);
+uint8 read_input_uint8 (uint16 slave_number, uint8 module_index) {
+    uint8 *data_ptr;
+    
+    data_ptr = ec_slave[slave_number].inputs;
+    data_ptr += module_index * 2;
+    
 
-         ec_config_map(&IOmap);
+    return *data_ptr;
+}
 
-         ec_configdc();	// Configure Distributed Clock
+/* Verify that the appropriate hardware is connected in correct order */
+uint32 verifyNetworkConfiguration() {
+    uint32 isOK = 1;
 
-         printf("Slaves mapped, state to SAFE_OP.\n");
-         /* wait for all slaves to reach SAFE_OP state */
-         ec_statecheck(0, EC_STATE_SAFE_OP,  EC_TIMEOUTSTATE * 4);	// EC_TIMEOUTSTATE = 2sec
-
-         oloop = ec_slave[0].Obytes;
-         if ((oloop == 0) && (ec_slave[0].Obits > 0)) oloop = 1;
-         if (oloop > 8) oloop = 8;
-         iloop = ec_slave[0].Ibytes;
-         if ((iloop == 0) && (ec_slave[0].Ibits > 0)) iloop = 1;
-         if (iloop > 8) iloop = 8;
-
-         printf("segments : %d : %d %d %d %d\n",ec_group[0].nsegments ,ec_group[0].IOsegment[0],ec_group[0].IOsegment[1],ec_group[0].IOsegment[2],ec_group[0].IOsegment[3]);
-
-         printf("Request operational state for all slaves\n");
-         expectedWKC = (ec_group[0].outputsWKC * 2) + ec_group[0].inputsWKC;
-         printf("Calculated workcounter %d\n", expectedWKC);
-         ec_slave[0].state = EC_STATE_OPERATIONAL;
-         /* send one valid process data to make outputs in slaves happy*/
-         ec_send_processdata();
-         ec_receive_processdata(EC_TIMEOUTRET);
-         /* request OP state for all slaves */
-         ec_writestate(0);
-         chk = 40;
-         /* wait for all slaves to reach OP state */
-         do
-         {
-            ec_send_processdata();
-            ec_receive_processdata(EC_TIMEOUTRET);
-            ec_statecheck(0, EC_STATE_OPERATIONAL, 50000);
-         }
-         while (chk-- && (ec_slave[0].state != EC_STATE_OPERATIONAL));
-         if (ec_slave[0].state == EC_STATE_OPERATIONAL )
-         {
-            printf("Operational state reached for all slaves.\n");
-            inOP = TRUE;
-                /* cyclic loop */
-            for(i = 1; i <= 10000; i++)
-            {
-               ec_send_processdata();
-               wkc = ec_receive_processdata(EC_TIMEOUTRET);
-
-                    if(wkc >= expectedWKC)
-                    {
-                        printf("Processdata cycle %4d, WKC %d , O:", i, wkc);
-
-                        for(j = 0 ; j < oloop; j++)
-                        {
-                            printf(" %2.2x", *(ec_slave[0].outputs + j));
-                        }
-
-                        printf(" I:");
-                        for(j = 0 ; j < iloop; j++)
-                        {
-                            printf(" %2.2x", *(ec_slave[0].inputs + j));
-                        }
-                        printf(" T:%"PRId64"\r",ec_DCtime);
-                        needlf = TRUE;
-                    }
-                    osal_usleep(5000);
-
-                }
-                inOP = FALSE;
-            }
-            else
-            {
-                printf("Not all slaves reached operational state.\n");
-                ec_readstate();
-                for(i = 1; i<=ec_slavecount ; i++)
-                {
-                    if(ec_slave[i].state != EC_STATE_OPERATIONAL)
-                    {
-                        printf("Slave %d State=0x%2.2x StatusCode=0x%4.4x : %s\n",
-                            i, ec_slave[i].state, ec_slave[i].ALstatuscode, ec_ALstatuscode2string(ec_slave[i].ALstatuscode));
-                    }
-                }
-            }
-            printf("\nRequest init state for all slaves\n");
-            ec_slave[0].state = EC_STATE_INIT;
-            /* request INIT state for all slaves */
-            ec_writestate(0);
-        }
-        else
-        {
-            printf("No slaves found!\n");
-        }
-        printf("End simple test, close socket\n");
-        /* stop SOEM, close socket */
-        ec_close();
+    if (ec_slavecount < SLAVE_COUNT) {
+        isOK = 0;
+    } else if (strcmp(ec_slave[EK1100].name, "EK1100")) {
+        isOK = 0;
+    } else if (strcmp(ec_slave[EL2024].name, "EL2024")) {
+        isOK = 0;
+    } else if (strcmp(ec_slave[EL1014].name, "EL1014")) {
+        isOK = 0;
     }
-    else
-    {
+    return isOK;
+}
+
+
+void basicInit(char *ifname) {
+    if (ec_init(ifname)) {
+        if (ec_config_init(FALSE) > 0) {
+            if (verifyNetworkConfiguration()) {
+                ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE *4);
+                ec_config_map(&IOmap);
+                ec_configdc();
+                ec_send_processdata();
+                wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+                ec_writestate(0);
+                /* wait for all slaves to reach OP state */
+                ec_statecheck(0, EC_STATE_OPERATIONAL,  EC_TIMEOUTSTATE);
+            } else {
+                printf("Incorrect Network Units!\n");
+                printf("Please see README for Setup instructions\n");
+            }
+        }
+    } else {
         printf("No socket connection on %s\nExcecute as root\n",ifname);
     }
 }
 
+
 /* 
- * Slave errror Handling
+ * Slave Error Handling
  */
 OSAL_THREAD_FUNC ecatcheck( void *ptr ) {
     int slave;
     (void)ptr;                  /* Not used */
-
+    
     while(1) {
+        wkc = ec_receive_processdata(EC_TIMEOUTRET);
+        expectedWKC = (ec_group[0].outputsWKC * 2) + ec_group[0].inputsWKC;
+        
         if (inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate)) {
             if (needlf) {
                needlf = FALSE;
@@ -204,23 +163,47 @@ OSAL_THREAD_FUNC ecatcheck( void *ptr ) {
     }
 }
 
-int main(int argc, char *argv[])
-{
-   printf("SOEM (Simple Open EtherCAT Master)\n");
-   printf("- Please See README for setup instructions -\n");
+/* Main Program Execution */
+int main(int argc, char *argv[]) {
+    int ii = 0;
 
-   if (argc > 1) {
-      /* create thread to handle slave error handling in OP */
-//      pthread_create( &thread1, NULL, (void *) &ecatcheck, (void*) &ctime);
-      osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
-      /* start cyclic part */
-      basicInit(argv[1]);
-   }
-   else
-   {
-      printf("Usage: simple_test ifname1\nifname = eth0 for example\n");
-   }
+    printf("\n--------------------------------------------\n");
+    printf("-    SOEM (Simple Open EtherCAT Master)    -\n");
+    printf("- Please See README for setup instructions -\n");
+    printf("--------------------------------------------\n\n");
+    
+    if (argc > 1) {
+        /* create thread to handle slave error handling in OP */
+        osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
+        /* start cyclic part */
+        basicInit(argv[1]);
+        
+        /* Set outputs to zero for EL2024. ii cycles through the channel number */
+        for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
+            set_output_int16(EL2024,ii,0);
+        }
+        
+        //Sleep here for some amount of time
+        
+        /* Read inputs from EL1014 */
+        for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {
+            printf("Channel %d, value: %d",ii,read_input_uint8(EL1014,ii));
+        }
+        
+        /* Set outputs to zero for EL2024. ii cycles through the channel number */
+        for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
+            set_output_int16(EL2024,ii,1);
+        }
+        
+        /* Read inputs from EL1014 */
+        for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {
+            printf("Channel %d, value: %d",ii,read_input_uint8(EL1014,ii));
+        }
+        
+    } else {
+        printf("Usage: simple_test ifname1\nifname = eth0 for example\n");
+    }
 
-   printf("End program\n");
-   return (0);
+    printf("End program\n");
+    return (0);
 }

@@ -23,5 +23,14 @@ Purpose:
   d) A power supply/or other 24 volt source can be hooked up to the inputs of the 
         EL1014 to simulate input.
      1.The program will then read the 4 channels from the EL1014 to verify 
-        successfull values are being read.
+        successful values are being read.
     
+    
+   * Alternative method of Hardware assembly *
+   Apply steps a) through b) the same as above.
+   c) Using a wire hook channel 1 of EL2024 into channel 1 of EL1014.
+        1) repeat step c) for all 4 channels, using the next channel of the EL2024 unit 
+        to hook into the cooresponding channel of the EL1014 unit.
+   d) Apply this step the same as above. 
+    **Plug the EL2024 OUTPUT channels into the EL1014 INPUT Channels to read out states.
+        (could be risky if slaves are not properly configured)
