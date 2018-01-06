@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
             set_output_int16(EL2024,ii,0);
         }
         
-        //Sleep here for some amount of time
+        osal_usleep(5000);        
         
         /* Read inputs from EL1014 */
         for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {
@@ -194,6 +194,8 @@ int main(int argc, char *argv[]) {
         for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
             set_output_int16(EL2024,ii,1);
         }
+        
+        osal_usleep(5000);        
         
         /* Read inputs from EL1014 */
         for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {

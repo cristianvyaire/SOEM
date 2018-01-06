@@ -28,9 +28,12 @@ Purpose:
     
    * Alternative method of Hardware assembly *
    Apply steps a) through b) the same as above.
-   c) Using a wire hook channel 1 of EL2024 into channel 1 of EL1014.
-        1) repeat step c) for all 4 channels, using the next channel of the EL2024 unit 
+   c) ** NOTE: The jumper wires being used for this step should have a 2A capable resistor 
+         attached to them in order to prevent the equiptment from being fried. **
+        1) Using a wire hook channel 1 of EL2024 into channel 1 of EL1014.
+        2) repeat step c) for all 4 channels, using the next channel of the EL2024 unit 
         to hook into the cooresponding channel of the EL1014 unit.
+        
    d) Apply this step the same as above. 
     **Plug the EL2024 OUTPUT channels into the EL1014 INPUT Channels to read out states.
         (could be risky if slaves are not properly configured)
