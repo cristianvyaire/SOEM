@@ -43,7 +43,7 @@ void set_output_int16 (uint16 slave_number, uint8 module_index, int16 value) {
      * addresses
      */
     *data_ptr++ = (value >> 0) & 0xFF;
-    *data_ptr++ = (value >> 8) & 0xFF;
+    *data_ptr++ = (value >> 2) & 0xFF;
 }
 
 uint8 read_input_uint8 (uint16 slave_number, uint8 module_index) {
@@ -64,28 +64,38 @@ uint32 verifyNetworkConfiguration() {
         isOK = 0;
     } else if (strcmp(ec_slave[EK1100].name, "EK1100")) {
         isOK = 0;
-    } else if (strcmp(ec_slave[EL2024].name, "EL2024")) {
-        isOK = 0;
     } else if (strcmp(ec_slave[EL1014].name, "EL1014")) {
         isOK = 0;
+        printf("%s",ec_slave[EL1014].name);
+    } else if (strcmp(ec_slave[EL2024].name, "EL2024")) {
+        isOK = 0;
     }
+
     return isOK;
 }
 
 
 void basicInit(char *ifname) {
     if (ec_init(ifname)) {
+    printf("%s", "network Initializtion complete\n");
         if (ec_config_init(FALSE) > 0) {
+            printf("%s", "Slave config Initializtion complete\n");
             if (verifyNetworkConfiguration()) {
+                printf("%s", "Network verified\n");
                 ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE *4);
                 ec_config_map(&IOmap);
                 ec_configdc();
+
+                /* wait for all slaves to reach OP state */
+                printf("%s", "waiting for slaves to reach OP state\n");
+                ec_statecheck(0, EC_STATE_OPERATIONAL,  EC_TIMEOUTSTATE);
+                printf("%s", "slaves reached OP state\n");
+
                 ec_send_processdata();
                 wkc = ec_receive_processdata(EC_TIMEOUTRET);
-
+                
+                ec_slave[0].state = EC_STATE_INIT;
                 ec_writestate(0);
-                /* wait for all slaves to reach OP state */
-                ec_statecheck(0, EC_STATE_OPERATIONAL,  EC_TIMEOUTSTATE);
             } else {
                 printf("Incorrect Network Units!\n");
                 printf("Please see README for Setup instructions\n");
@@ -159,7 +169,7 @@ OSAL_THREAD_FUNC ecatcheck( void *ptr ) {
                printf("OK : all slaves resumed OPERATIONAL.\n");
             }
         }
-        osal_usleep(10000);
+//        osal_usleep(10000);
     }
 }
 
@@ -174,33 +184,42 @@ int main(int argc, char *argv[]) {
     
     if (argc > 1) {
         /* create thread to handle slave error handling in OP */
-        osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
+        //osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
+        
         /* start cyclic part */
         basicInit(argv[1]);
         
+    while (1) {
+        printf("\nSetting Outputs to: 0\n");
         /* Set outputs to zero for EL2024. ii cycles through the channel number */
         for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
-            set_output_int16(EL2024,ii,0);
+            set_output_int16(EL2024,ii,0x00);
         }
-        
+        ec_send_processdata();
+     //   ec_receive_processdata(EC_TIMEOUTRET);
         osal_usleep(5000);        
         
         /* Read inputs from EL1014 */
         for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {
-            printf("Channel %d, value: %d",ii,read_input_uint8(EL1014,ii));
+            printf("Channel %d, value: %d\n",ii,read_input_uint8(EL1014,ii));
         }
+        printf("\n");
         
-        /* Set outputs to zero for EL2024. ii cycles through the channel number */
+        printf("Setting Outputs to: 1\n");
+        /* Set outputs to 1 for EL2024. ii cycles through the channel number */
         for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
-            set_output_int16(EL2024,ii,1);
+            set_output_int16(EL2024,ii,0xF);
         }
-        
+        ec_send_processdata();
+       // ec_receive_processdata(EC_TIMEOUTRET);
         osal_usleep(5000);        
         
         /* Read inputs from EL1014 */
         for (ii = 0; ii < ec_slave[EL1014].Ibits; ++ii) {
-            printf("Channel %d, value: %d",ii,read_input_uint8(EL1014,ii));
+            printf("Channel %d, value: %d\n",ii,read_input_uint8(EL1014,ii));
         }
+        }
+        ec_close();
         
     } else {
         printf("Usage: simple_test ifname1\nifname = eth0 for example\n");

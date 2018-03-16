@@ -140,6 +140,7 @@ void simpletest(char *ifname)
     {
         printf("No socket connection on %s\nExcecute as root\n",ifname);
     }
+    ec_close();
 }
 
 OSAL_THREAD_FUNC ecatcheck( void *ptr )

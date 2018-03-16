@@ -20,9 +20,10 @@ Purpose:
   c) A sillyscope can be used to verify that the intended commands are being issued.
      1. A set of outputs will be sent to the EL2024 to zero out the ouptuts
      2. Then a set of command will be sent to set outputs to logic high.
+     
   d) A power supply/or other 24 volt source can be hooked up to the inputs of the 
         EL1014 to simulate input.
-     1.The program will then read the 4 channels from the EL1014 to verify 
+     1. The program will then read the 4 channels from the EL1014 to verify 
         successful values are being read.
     
     
