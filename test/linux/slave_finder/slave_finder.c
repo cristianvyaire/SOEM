@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
             printSlaves(ec_slavecount);
         }
     } else {
-        printf("Usage: simple_finder ifname1\nifname = eth0 for example\n");
+        printf("Usage: slave_finder ifname1\nifname = eth0 for example\n");
     }
 
     return 0;

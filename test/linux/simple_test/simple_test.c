@@ -51,6 +51,11 @@ void simpletest(char *ifname)
          /* wait for all slaves to reach SAFE_OP state */
          ec_statecheck(0, EC_STATE_SAFE_OP,  EC_TIMEOUTSTATE * 4);	// EC_TIMEOUTSTATE = 2sec
 
+
+        uint16 state = ec_slave[0].state;
+        printf("\nSTATE: %d\n", state); 
+
+
          oloop = ec_slave[0].Obytes;
          if ((oloop == 0) && (ec_slave[0].Obits > 0)) oloop = 1;
          if (oloop > 8) oloop = 8;
@@ -228,7 +233,7 @@ int main(int argc, char *argv[])
    {
       /* create thread to handle slave error handling in OP */
 //      pthread_create( &thread1, NULL, (void *) &ecatcheck, (void*) &ctime);
-      osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
+      //osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
       /* start cyclic part */
       simpletest(argv[1]);
    }
