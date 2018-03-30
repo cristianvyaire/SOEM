@@ -23,6 +23,7 @@
 #define EL2024    2
 #define EL1014    3
 #define SLAVE_COUNT 3
+#define LOOP_RUN_AMT 1
 
 char IOmap[4096];
 OSAL_THREAD_HANDLE thread1;
@@ -67,7 +68,7 @@ void basicInit(char *ifname) {
     printf("%s", "network Initializtion complete\n");
         if (ec_config_init(FALSE) > 0) {
             printf("%s", "Slave config Initializtion complete\n");
-            if (verifyNetworkConfiguration()) {
+            //if (verifyNetworkConfiguration()) {
                 printf("%s", "Network verified\n");
                 ec_config_map(&IOmap);
                 ec_configdc();
@@ -77,10 +78,10 @@ void basicInit(char *ifname) {
                 
                 ec_slave[0].state = EC_STATE_OPERATIONAL;
                 ec_writestate(0);
-            } else {
-                printf("Incorrect Network Units!\n");
-                printf("Please see README for Setup instructions\n");
-            }
+            //} else {
+            //    printf("Incorrect Network Units!\n");
+            //    printf("Please see README for Setup instructions\n");
+            //}
         }
     } else {
         printf("No socket connection on %s\nExcecute as root\n",ifname);
@@ -97,7 +98,15 @@ void set_output_int16 (uint16 slave_number, uint8 module_index, int16 value) {
      * addresses
      */
     *data_ptr++ = (value >> 0) & 0xFF;
-    *data_ptr++ = (value >> 2) & 0xFF;
+   // *data_ptr++ = (value >> 2) & 0xFF;
+}
+
+void printIOMap() {
+    int cnt = 0;
+    for (cnt = 0; cnt < 24; ++cnt) {
+        printf("%u ", IOmap[cnt]);
+    }
+    printf("\n");
 }
 
 
@@ -112,29 +121,38 @@ int main(int argc, char *argv[]) {
     printf("--------------------------------------------\n\n");
     
     if (argc > 1) {
-        /* create thread to handle slave error handling in OP */
-        //osal_thread_create(&thread1, 128000, &ecatcheck, (void*) &ctime);
-        
-        /* start cyclic part */
         basicInit(argv[1]);
         
-        printf("\nBegin Toggle of Digital Output");
-//        while (ii > 0) {
-        for (jj = 0; jj < 10; ++jj) {
-            uint8 channel = 0b0001111;
+        printf("\nBegin Toggle of Digital Output\n");
+        
+        for (jj = 0; jj < LOOP_RUN_AMT; ++jj) {
+            uint8 channel = 0b00001111;
             for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
                 set_output_int16(EL2024,0,channel);
                 ec_send_processdata();
+                //osal_usleep(500);
+                ec_receive_processdata(EC_TIMEOUTRET);
+                //int value = read_input_uint8(EL1014,0);
+                //printf("Value: %u\n", value);
+                printIOMap();
                 channel <<= 1;
                 channel &= 0b00001111;  // Turns off 1 channel at a time
                 osal_usleep(50000);
             }
+            
+            
             osal_usleep(50000);
+
             for (ii = 0; ii < ec_slave[EL2024].Obits; ++ii) {
                 set_output_int16(EL2024,0,channel);
                 channel |= 0b00010000;  // Turns on 1 channel at a time
                 channel >>= 1;
                 ec_send_processdata();
+                //osal_usleep(500);
+                ec_receive_processdata(EC_TIMEOUTRET);
+                //int value = read_input_uint8(EL1014,0;
+                //printf("Value: %u\n", value);
+                printIOMap();
                 osal_usleep(50000);
             }
         }

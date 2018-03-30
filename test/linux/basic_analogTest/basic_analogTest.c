@@ -20,8 +20,10 @@
 #define EL2024    2
 #define EL1014    3
 #define SLAVE_COUNT 3
+#define MEM_SIZE  12
 
-char IOmap[4096];
+
+char IOmap[12];
 int expectedWKC;
 boolean needlf;
 volatile int wkc;
@@ -29,62 +31,21 @@ boolean inOP;
 uint8 currentgroup = 0;
 
 
-void set_output_int16 (uint16 slave_number, uint8 module_index, int16 value, int16 address) {
-    uint8 *data_ptr;
-
-    data_ptr = ec_slave[slave_number].outputs;
-    /* Move pointer to correct module index*/
-    data_ptr += module_index * 2;
-    /* Read value byte by byte since all targets can't handle misaligned
-     * addresses
-     */
-    *data_ptr++ = (value >> 0) & 0xFF;
-    *data_ptr++ = (value >> address) & 0xFF;
-}
-
-/* Verify that the appropriate hardware is connected in correct order */
-uint32 verifyNetworkConfiguration() {
-    uint32 isOK = 1;
-
-    if (ec_slavecount < SLAVE_COUNT) {
-        isOK = 0;
-    } else if (strcmp(ec_slave[EK1100].name, "EK1100")) {
-        isOK = 0;
-    } else if (strcmp(ec_slave[EL1014].name, "EL1014")) {
-        isOK = 0;
-        printf("%s",ec_slave[EL1014].name);
-    } else if (strcmp(ec_slave[EL2024].name, "EL2024")) {
-        isOK = 0;
-    }
-
-    return isOK;
-}
-
-
 void basicInit(char *ifname) {
     if (ec_init(ifname)) {
         printf("%s", "network Initializtion complete\n");
         if (ec_config_init(FALSE) > 0) {
             printf("%s", "Slave config Initializtion complete\n");
-            //if (verifyNetworkConfiguration()) {
-                printf("%s", "Network verified\n");
-                ec_config_map(&IOmap);
-                ec_configdc();
+           
+            int usedmem = ec_config_map(&IOmap);
+            printf("UsedMem: %d\n", usedmem);
+            ec_configdc();
 
-                /* wait for all slaves to reach OP state */
-//                printf("waiting for slaves to reach OP state...\n");
-//                ec_statecheck(0, EC_STATE_OPERATIONAL,  EC_TIMEOUTSTATE);
-//                printf("...slaves reached OP state\n");
-
-                ec_send_processdata();
-                wkc = ec_receive_processdata(EC_TIMEOUTRET);
-                
-                ec_slave[0].state = EC_STATE_OPERATIONAL;
-                ec_writestate(0);
-            //} else {
-            //    printf("Incorrect EtherCAT Terminals!\n");
-            //    printf("Please see README for Setup instructions\n");
-            //}
+            ec_send_processdata();
+            wkc = ec_receive_processdata(EC_TIMEOUTRET);
+            
+            ec_slave[0].state = EC_STATE_OPERATIONAL;
+            ec_writestate(0);
         }
     } else {
         printf("No socket connection on %s\nExcecute as root\n",ifname);
@@ -92,9 +53,9 @@ void basicInit(char *ifname) {
 }
 
 void printSlaveInformation() {
-    int cnt;
-
     printf("%d slaves found and configured.\n",ec_slavecount);
+
+    int cnt;
     for( cnt = 1 ; cnt <= ec_slavecount ; cnt++)
          {
          printf("\nSlave:%d\n Name:%s\n Output size: %dbits\n Input size: %dbits\n State: %d\n Delay: %d[ns]\n",
@@ -106,14 +67,10 @@ void printSlaveInformation() {
 
 void printIOMap() {
     int cnt = 0;
-    for (cnt = 0; cnt < 64; ++cnt) {
+    for (cnt = 0; cnt < MEM_SIZE; ++cnt) {
         printf("%d ", IOmap[cnt]);
-        
-        if(cnt % 64 == 0) {
-            printf("\r");
-        }
     }
-    printf("\r");
+    printf("\n");
 }
 
 int findSpecificSlaveAddress() {
@@ -126,15 +83,18 @@ int findSpecificSlaveAddress() {
     return -1;
 }
 
-long unsigned int read_input_uint64 (uint16 slave_number, uint8 module_index) {
-    uint8* data_ptr;
-    
-    data_ptr = ec_slave[slave_number].inputs;
-    data_ptr += module_index * 2;
+unsigned int read_input_uint64 (uint16 slave_number, uint8 channel) {
+    uint8* data_ptr = ec_slave[slave_number].inputs;
+    data_ptr += channel * 2;
     
     return *data_ptr;
 }
 
+void set_AnalogOutput(uint16 slave_number, uint8 channel) {
+    uint8 *data_ptr = ec_slave[slave_number].outputs;
+    data_ptr += channel * 2;
+    *data_ptr = (80);
+}
 
 /* Main Program Execution */
 int main(int argc, char *argv[]) {
@@ -156,14 +116,21 @@ int main(int argc, char *argv[]) {
         printf("\nAddress for EL3062: %d\n",address);
 
         state = ec_slave[0].state;
-        printf("\nState of EL3062: %d\n", state);        
+        printf("\nState of EL3062: %d\n", state);      
+        printIOMap();
                 
         while(1) {
+            set_AnalogOutput(2,0);      //output
+                                        // channel 0 output -> 1 input    
+                                        // channel 1 output -> 3 input
+                                            
+            osal_usleep(500);
             ec_send_processdata();
             ec_receive_processdata(EC_TIMEOUTRET);
-            long unsigned int value = read_input_uint64(address,1);
-            printf("reading: %lu\r",value);
-            osal_usleep(5000);
+            unsigned int value = read_input_uint64(address,1);  // input
+            printIOMap();
+            printf("reading: %u\n",value);
+            osal_usleep(50000);
         }
         
         ec_close();
